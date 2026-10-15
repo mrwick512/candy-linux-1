@@ -8,7 +8,11 @@
 live-boot
 live-config
 live-config-systemd
-sudo
+sudo 
+   user-setup
+   xauth
+   at-spi2-core
+   libglib2.0-bin
 locales
 tzdata
 console-setup
