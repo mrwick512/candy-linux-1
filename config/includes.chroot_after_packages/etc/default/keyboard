@@ -1,0 +1,9 @@
+# Chromebook keyboard model: the right Alt key becomes a modifier for
+# F1-F10, Page Up/Down, Home/End, Caps Lock and Delete. Alt+Shift switches
+# between US and Arabic layouts.
+XKBMODEL="chromebook"
+XKBLAYOUT="us,ara"
+XKBVARIANT=","
+XKBOPTIONS="grp:alt_shift_toggle"
+
+BACKSPACE="guess"

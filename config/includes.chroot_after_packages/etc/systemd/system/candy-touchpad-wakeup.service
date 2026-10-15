@@ -1,0 +1,10 @@
+[Unit]
+Description=Disable touchpad/touchscreen ACPI wake on the Dell Chromebook 11 (candy)
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/candy/touchpad-wakeup.sh
+
+[Install]
+WantedBy=multi-user.target

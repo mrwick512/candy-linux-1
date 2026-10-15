@@ -1,0 +1,19 @@
+#!/bin/sh
+# Enable the Candy units and trim boot time.
+set -e
+
+systemctl enable candy-touchpad-wakeup.service
+systemctl enable candy-firstboot.service
+systemctl enable tlp.service || true
+systemctl enable fstrim.timer || true
+
+# Waiting for the network at boot only slows a laptop down.
+systemctl disable NetworkManager-wait-online.service || true
+
+# Identify the image.
+echo "Candy Linux (Debian 13 base) for Dell Chromebook 11 3120 'candy'" > /etc/candy-release
+printf 'Candy Linux \\n \\l\n\n' > /etc/issue
+
+# The helpers must be executable even if the repo was unpacked on Windows.
+chmod 0755 /usr/local/bin/candy-diag /usr/local/lib/candy/*.sh
+chmod 0755 /etc/skel/Desktop/install-candy-linux.desktop

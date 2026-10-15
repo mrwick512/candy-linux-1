@@ -1,0 +1,11 @@
+[Unit]
+Description=Candy Linux first-boot adjustments
+Before=display-manager.service
+ConditionPathExists=!/var/lib/candy/firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/candy/firstboot.sh
+
+[Install]
+WantedBy=multi-user.target

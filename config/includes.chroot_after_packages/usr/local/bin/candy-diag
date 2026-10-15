@@ -1,0 +1,96 @@
+#!/bin/bash
+# candy-diag - hardware report for the Dell Chromebook 11 3120 (codename "candy").
+#
+# Usage:  sudo candy-diag [output-file]
+#
+# Prints what the kernel found for audio, Wi-Fi, Bluetooth, touchpad, keyboard,
+# power, storage and graphics, and saves it to a text file so it can be attached
+# to a bug report or compared between kernels. Read-only: it changes nothing.
+
+OUT="${1:-candy-diag-$(date +%Y%m%d-%H%M%S).txt}"
+exec > >(tee "$OUT") 2>&1
+
+section() { printf '\n===== %s =====\n' "$1"; }
+have()    { command -v "$1" >/dev/null 2>&1; }
+run()     {
+	printf '$ %s\n' "$*"
+	if have "$1"; then "$@" 2>&1 || true; else echo "(skipped: $1 is not installed)"; fi
+}
+dmi()     { cat "/sys/class/dmi/id/$1" 2>/dev/null || echo "?"; }
+
+[ "$(id -u)" = 0 ] || echo "NOTE: not running as root; dmesg, libinput and eMMC details may be missing."
+
+section "System"
+echo "vendor:   $(dmi sys_vendor)"
+echo "product:  $(dmi product_name)"
+echo "board:    $(dmi board_name)"
+echo "firmware: $(dmi bios_vendor) $(dmi bios_version)"
+if [ -d /sys/firmware/efi ]; then echo "boot:     UEFI"; else echo "boot:     legacy BIOS (SeaBIOS)"; fi
+case "$(dmi product_name)$(dmi board_name)" in
+	*[Cc]andy*) echo "match:    looks like a candy" ;;
+	*) echo "WARNING:  DMI does not say 'Candy' - these settings are tuned for the Dell Chromebook 11 3120." ;;
+esac
+run uname -r
+grep -m1 'model name' /proc/cpuinfo
+grep -E 'MemTotal|SwapTotal' /proc/meminfo
+
+section "Audio (expect a card named chtmax98090, or sof-bytcht max98090 on the SOF driver)"
+run cat /proc/asound/cards
+run aplay -l
+echo "UCM profiles shipped for Cherry/Bay Trail:"
+find /usr/share/alsa/ucm2/conf.d -maxdepth 1 -iname '*cht*' -printf '%f\n' 2>/dev/null
+echo "DSP firmware present:"
+find /lib/firmware/intel -maxdepth 1 \( -name 'fw_sst*' -o -name 'sof*' \) -printf '%f\n' 2>/dev/null
+dmesg 2>/dev/null | grep -iE 'sst|max98090|bytcht|cht-bsw|sof-' | tail -n 25
+have wpctl && run wpctl status
+
+section "Wi-Fi and Bluetooth (expect Intel 7260 via iwlwifi)"
+lspci -nnk 2>/dev/null | grep -iA3 'network'
+run rfkill list
+have iw && run iw dev
+have bluetoothctl && run bluetoothctl list
+dmesg 2>/dev/null | grep -iE 'iwlwifi|bluetooth|ibt' | tail -n 20
+
+section "Keyboard and touchpad"
+run cat /etc/default/keyboard
+have setxkbmap && [ -n "${DISPLAY:-}" ] && run setxkbmap -query
+if have libinput; then
+	libinput list-devices 2>/dev/null | grep -E '^(Device|Kernel)|Capabilities' | head -n 30
+fi
+have lsmod && lsmod | grep -E 'cyapa|elan_i2c|atmel_mxt|hid_multitouch|i2c_hid|elants_i2c|i8042|atkbd'
+
+section "Power"
+echo "ACPI wake sources (TPAD/TSCR should be disabled):"
+grep -E '^(TPAD|TSCR|LID0|PWRB)' /proc/acpi/wakeup 2>/dev/null
+echo "mem_sleep: $(cat /sys/power/mem_sleep 2>/dev/null)"
+echo "cpufreq:   $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver 2>/dev/null) / $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)"
+have acpi && run acpi -V
+for z in /sys/class/thermal/thermal_zone*; do
+	[ -r "$z/type" ] && echo "thermal: $(cat "$z/type") $(( $(cat "$z/temp" 2>/dev/null || echo 0) / 1000 )) C"
+done
+
+section "Storage and memory"
+run lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT
+run swapon --show
+have zramctl && run zramctl
+if have mmc; then
+	for d in /sys/block/mmcblk*; do
+		n="${d##*/}"
+		case "$n" in *boot*|*rpmb) continue ;; esac
+		[ "$(cat "$d/device/type" 2>/dev/null)" = "MMC" ] || continue
+		echo "eMMC health for /dev/$n:"
+		mmc extcsd read "/dev/$n" 2>&1 | grep -E 'EXT_CSD_REV|LIFE_TIME|PRE_EOL' || true
+	done
+fi
+
+section "Graphics and camera"
+lspci -nnk 2>/dev/null | grep -iA3 'vga'
+dmesg 2>/dev/null | grep -iE 'i915|drm' | tail -n 10
+ls /dev/video* 2>/dev/null || echo "no /dev/video* device"
+dmesg 2>/dev/null | grep -i uvc | tail -n 5
+
+section "Firmware load failures (anything here points at a missing firmware package)"
+dmesg 2>/dev/null | grep -iE 'direct firmware load|failed to load|firmware.*not found' | tail -n 30
+
+echo
+echo "Report saved to: $OUT"

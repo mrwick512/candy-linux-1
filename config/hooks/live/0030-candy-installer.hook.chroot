@@ -1,0 +1,8 @@
+#!/bin/sh
+# Calamares installer with its Debian settings. Installed WITH recommends,
+# because it needs several Qt/QML modules that are only recommended.
+set -e
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update -q
+apt-get install -y --install-recommends calamares calamares-settings-debian

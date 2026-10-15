@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Install Candy Linux
+Comment=Install to the internal eMMC (or any other disk)
+Exec=sudo -E calamares
+Icon=calamares
+Terminal=false
+Categories=System;
