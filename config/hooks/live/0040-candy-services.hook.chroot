@@ -4,6 +4,7 @@ set -e
 
 systemctl enable candy-touchpad-wakeup.service
 systemctl enable candy-firstboot.service
+systemctl enable candy-live-password.service
 systemctl enable tlp.service || true
 systemctl enable fstrim.timer || true
 
