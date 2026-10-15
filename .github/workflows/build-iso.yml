@@ -1,0 +1,60 @@
+name: Build Candy Linux ISO
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "auto/**"
+      - "config/**"
+      - "tools/**"
+      - "build.sh"
+      - ".github/workflows/**"
+
+permissions:
+  contents: write # needed only to attach the ISO to a release on tag builds
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # live-build needs a real Debian userland and mount/chroot rights.
+    container:
+      image: debian:trixie
+      options: --privileged
+    steps:
+      - name: Prepare container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Build ISO
+        run: sh ./build.sh native
+
+      - name: Upload build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: candy-linux-iso
+          path: |
+            candy-linux-*.iso
+            SHA256SUMS
+          retention-days: 14
+
+      - name: Attach to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            candy-linux-*.iso
+            SHA256SUMS
